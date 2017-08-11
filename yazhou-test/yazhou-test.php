@@ -199,5 +199,148 @@ function yazhouTestWidget () {
 
 /*
  * Lesson 11：后台整合，元数据框
- *  
+ *      什么事元数据框，比如在撰写新文章的地方（文章 - 写文章），有很多像“自定义栏目”、“发布”、“分类目录”这样的框，这些东西可以保存属于主体的一些信息，这就叫做元数据框。
+ *      添加元数据框
+ *      Passed
  */
+
+// Adds a box to the main column on the Post and Page edit screen
+//function myplugin_add_meta_box() {
+//    $screens    =  [
+//        'post',
+//        'page'
+//    ];
+//    add_meta_box(
+//        'myplugin_sectionid',
+//        __('My Post Section Title', 'myplugin_textdomain'),
+//        'myplugin_meta_box_callback',
+//        $screens
+//    );
+//}
+
+// 需要给 add_meta_box 钩子挂载一个自定义方法
+//add_action('add_meta_box', 'myplugin_add_meta_box');
+//
+//function myplugin_meta_box_callback($post) {
+    // add a nonce field so we can check for it later
+    // 添加一个验证信息，这个在保存元数据的时候会用到
+//    wp_nonce_field('myplugin_save_meta_box_data', 'myplugin_meta_box_nonce');
+
+    /*
+     * update get_post_meta() to retrieve an existing value
+     * from the database and use the value for the form
+     */
+//    $value    =  get_post_meta($post->ID, '_my_meta_value_key', true);
+//
+//    echo '<label for="myplugin_new_field">';
+//    _e('Description for this field', 'myplugin_textdomain');
+//    echo '</label>';
+//    echo '<input type="text" id="myplugin_new_field" name="myplugin_new_field" value="' . esc_attr($value) . '" size="25"/>';
+//}
+
+
+
+/*
+ * Lesson 12：自定义插件界面
+ *  案例
+ *  wrap类：一定要添加这个div
+ *  消息：保存成功或者失败时弹出提示
+ *  按钮
+ *  表单
+ *  表格
+ *  分页
+`*/
+
+function yazhouTestPages() {
+    ?>
+        <div class="wrap">
+            <h2>插件顶级菜单</h2>
+
+            <!--消息-->
+            <div id="message" class="updated"><p><strong>设置保存成功</strong></p></div>
+            <div id="message" class="error"><p><strong>保存出现错误</strong></p></div>
+
+            <!--按钮，改变class来改变样式-->
+            <p>
+                <input type="submit" name="Save" value="保存设置"/>
+                <input type="submit" name="Save" value="保存设置" class="button"/>
+                <input type="submit" name="Save" value="保存设置" class="button-primary"/>
+                <input type="submit" name="Save" value="保存设置" class="button-secondary"/>
+                <input type="submit" name="Save" value="保存设置" class="button-large"/>
+                <input type="submit" name="Save" value="保存设置" class="button-small"/>
+                <input type="submit" name="Save" value="保存设置" class="button-hero"/>
+            </p>
+
+            <!--表单-->
+            <form method="POST" action="">
+                <table class="form-table">
+                    <tr valign="top">
+                        <th><label for="xingming">姓名：</label></th>
+                        <th><input id="xingming" name="xingming"/>/th>
+                    </tr>
+                    <tr valign="top">
+                        <th><label for="shenfen">身份：</label></th>
+                        <td>
+                            <select name="shenfen">
+                                <option value="在校">在校</option>
+                                <option value="毕业">毕业</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr valign="top">
+                        <th><label for="tongyi">同意注册</label></th>
+                        <td><input type="checkbox" name="tongyi" /></td>
+                    </tr>
+                    <tr valign="top">
+                        <th><label for="xingbie">性别</label></th>
+                        <td>
+                            <input type="radio" name="xingbie" value="男"/>男
+                            <input type="radio" name="xingbie" value="女"/>女
+                        </td>
+                    </tr>
+                    <tr valign="top">
+                        <th><label for="beizhu">备注</label></th>
+                        <td><textarea name="beizhu"></textarea></td>
+                    </tr>
+                    <tr valign="top">
+                        <td>
+                            <input type="submit" name="save" value="保存" class="button-primary">
+                            <input type="submit" name="reset" value="重置" class="button-secondary">
+                        </td>
+                    </tr>
+                </table>
+            </form>
+
+            <!--表格-->
+            <table class="widefat striped">
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>姓名</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td>黄聪</td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td>黄聪</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!--分页-->
+            <div class="tablenav">
+                <div class="tablenav-pages">
+                    <span class="displaying-num">第一页，共457页</span>
+                    <span class="page-numbers current">1</span>
+                    <a href="#" class="page-numbers">2</a>
+                    <a href="#" class="page-numbers">3</a>
+                    <a href="#" class="page-numbers">4</a>
+                    <a href="#" class="next page-numbers">》</a>
+            </div>
+        </div>
+    <?
+}
