@@ -1,3 +1,5 @@
-*.php
 akismet
 yazhou-test
+
+/hello.php
+/index.php
