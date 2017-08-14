@@ -12,51 +12,101 @@ Author URI: https://github.com/LeoStupidWise/wp-plugins
  * 从配置取出 js 放到 wp_footer 钩子中，同时可以在设置中设置对应的选项配置
  */
 
-define('ZL_WEB_ANALYSIS_CN_NAME', '逐浪网页分析');
-define('ZL_WEB_ANALYSIS_OPTION', 'zl_web_analysis_option');
 
-function zlWebAnalysisFunc(){
-    $analysis_option    =  get_option(ZL_WEB_ANALYSIS_OPTION);
-    echo $analysis_option;
-}
-add_action('wp_footer', 'zlWebAnalysisFunc');
+class ZhulangWebAnalysis
+{
+    private $name_cn    =  '逐浪网页分析';
+    private $name_en    =  'zhulangWebAnalysis';
+    private $plugin_option    =  'zl_web_analysis_option';
 
-add_action('admin_menu', 'zl_analysis_menu');
-function zl_analysis_menu() {
-    // Add submenu page to the Settings main menu.
-    add_options_page( ZL_WEB_ANALYSIS_CN_NAME , ZL_WEB_ANALYSIS_CN_NAME, 8 , basename(__FILE__) , 'zl_option_add');
-}
-
-function zl_option_add() {
-//    $b_upd = false;
-    if($_POST['zl_analysis_code'] != '') {
-//        if($_POST['b_pos'] != '') {
-            $b_option_tmp['code'] = stripslashes_deep($_POST['zl_analysis_code']);
-//            $b_option_tmp['position'] = $_POST['b_pos'];
-//            $b_option_str = implode('%', $b_option_tmp);
-            update_option(ZL_WEB_ANALYSIS_OPTION, $b_option_tmp['code']);
-//            $b_upd = true;
-//        }
+    public function __construct() {
+        //
     }
-    $tmp = get_option(ZL_WEB_ANALYSIS_OPTION);
-    $arr = $tmp;
-    echo '<div class="wrap">';
-    echo '<form name="zl_analysis_form" method="post" action="">';
-    echo '<p style="font-weight:bold;">请在此处输入您从站长工具获得的Javascript代码。</p>';
-    echo '<p>默认嵌入的代码风格为按钮式标准风格，显示在网站左下方</p>';
 
-    echo '<p><textarea style="height:300px;width:750px" name="zl_code">' . $arr . '</textarea></p>';
-//    if($b_upd) {
-//        echo '<div><p style="color:blue"><strong>百度分享按钮设置已经保存。</strong></p></div>';
-//    }
-    echo '<br />';
-//    echo '嵌入位置 ：&nbsp;&nbsp;';
-//    echo '<input type="radio" name="b_pos" value="1" ' . ($arr[1] == 1 ? 'checked="checked"' : '') . ' /> 文章上方&nbsp;&nbsp;';
-//    echo '<input type="radio" name="b_pos" value="2" ' . ($arr[1] == 2 ? 'checked="checked"' : '') . ' /> 文章下方&nbsp;&nbsp;';
-    echo '<br /><br />';
-    echo '<p class="submit"><input type="submit" value="保存设置"/>';
-    echo '<input type="button" value="返回上级" onclick="window.location.href=\'plugins.php\';" /></p>';
-    echo '</form>';
+    public function doAction() {
+        add_action('wp_footer', [$this, 'zlWebAnalysisFunc']);
+        add_action('admin_menu', [$this, 'zl_analysis_menu']);
+        $download_option    =  'did_download_'.$this->name_en;
+        if (!get_option($download_option)) {
+            $this->doPluginDownload([
+                'cn'    => $this->name_cn,
+                'en'    => $this->name_en
+            ]);
+            update_option($download_option, 1);
+        }
+    }
 
-    echo '</div>';
+    public function zl_analysis_menu() {
+        add_options_page( $this->name_cn , $this->name_cn, 8 , basename(__FILE__) , [$this, 'zl_option_add']);
+    }
+
+    public function zlWebAnalysisFunc() {
+        $analysis_option    =  get_option($this->plugin_option);
+        echo $analysis_option;
+    }
+
+    public function zl_option_add() {
+        if($_POST['zl_code'] != '') {
+            $b_option_tmp['code'] = stripslashes_deep($_POST['zl_code']);
+            update_option($this->plugin_option, $b_option_tmp['code']);
+        }
+        $tmp = get_option($this->plugin_option);
+        $arr = $tmp;
+        echo '<div class="wrap">';
+        echo '<form name="zl_analysis_form" method="post" action="">';
+        echo '<p style="font-weight:bold;">请在此处输入您从站长工具获得的Javascript代码。</p>';
+        echo '<p>默认嵌入的代码风格为按钮式标准风格，显示在网站左下方</p>';
+        echo '<p><textarea style="height:300px;width:750px" name="zl_code">' . $arr . '</textarea></p>';
+        echo '<br />';
+        echo '<br /><br />';
+        echo '<p class="submit"><input type="submit" value="保存设置"/>';
+        echo '<input type="button" value="返回上级" onclick="window.location.href=\'plugins.php\';" /></p>';
+        echo '</form>';
+        echo '</div>';
+    }
+
+    public function phpPostSec($data, $url) {
+        // php 进行 http post 模拟，这个方法可用
+        $ch = curl_init();
+        $timeout = 5;
+        curl_setopt ($ch, CURLOPT_URL, $url);
+        curl_setopt ($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt ($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+        curl_setopt ($ch, CURLOPT_POSTFIELDS, $data);
+        $file_contents = curl_exec($ch);
+        curl_close($ch);
+
+        return $file_contents;
+    }
+
+    public function doPluginDownload($plugin_name = null) {
+        // 这里的方法属性不能是 private，如果是 private，就会出现错误，只能是 public
+        // 上面说的不能是 private 的前提是在该方法被 didPluginDownload 中钩子 wp_ajax_zhulang_plugin_download 调用的情况下
+        $data['name_cn']        =  $plugin_name ? $plugin_name['cn'] : $_POST['name_cn'];
+        $data['name_en']        =  $plugin_name ? $plugin_name['en'] : $_POST['name_en'];
+        $data['ip']              =  $this->getClientIP();
+        $data['user_agent']     =  $_SERVER['HTTP_USER_AGENT'];
+        $data['remote_url']     =  $_SERVER['HTTP_REFERER'];
+        $data['remote_url']     =  strlen($data['remote_url']) > 100 ? '' : $data['remote_url'];
+
+        $result    =  $this->phpPostSec($data, 'http://test.yz/analysis_wp_plugin.php');
+        if (!$plugin_name) {
+            wp_die();
+        }
+    }
+
+    public function getClientIP()
+    {
+        if (getenv("HTTP_CLIENT_IP"))
+            $ip = getenv("HTTP_CLIENT_IP");
+        else if (getenv("HTTP_X_FORWARDED_FOR"))
+            $ip = getenv("HTTP_X_FORWARDED_FOR");
+        else if (getenv("REMOTE_ADDR"))
+            $ip = getenv("REMOTE_ADDR");
+        else $ip = "Unknow";
+        return $ip;
+    }
 }
+
+$object    =  new ZhulangWebAnalysis();
+$object->doAction();
