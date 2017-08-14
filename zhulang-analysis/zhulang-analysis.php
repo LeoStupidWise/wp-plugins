@@ -5,7 +5,7 @@ Plugin URI:
 Description: 使用该插件能让您更好的采集站点信息，从而更好的运营您的站点。<a href="options-general.php?page=zhulang-baidushare.php">启用插件后，可以点击这里进行配置</a>。
 Version: 1.0
 Author: Zoe
-Author URI:
+Author URI: https://github.com/LeoStupidWise/wp-plugins
 */
 
 /*
