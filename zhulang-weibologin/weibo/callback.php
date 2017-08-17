@@ -32,8 +32,11 @@ $oauth   =  $object->getAccessToken('code', $keys);
 
 $_SESSION['zl_weibo_accesstoken']    =   $oauth['access_token'];
 $_SESSION['zl_weibo_uid']    =  $oauth['uid'];
+$_SESSION['zl_weibo_identifier']    =  $oauth['name'];
 
 $client_obj   =  new SaeTClientV2(WB_KEY, WB_SEC, $oauth['access_token']);
 $user    =  $client_obj->show_user_by_id($oauth['uid']);
+
+//var_dump($user);
 
 header('Location: http://test.wp.yz/wp-login.php');

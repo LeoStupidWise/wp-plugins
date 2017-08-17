@@ -55,6 +55,9 @@ class ZhulangWeiboLogin
         // 是否微博登录
 
         add_action('wp_logout', [$this, 'userLogout']);
+        // 登出是释放 session
+
+        add_action('admin_menu', [$this, 'adminMenu']);
     }
 
     public function getClientIP()
@@ -115,7 +118,7 @@ class ZhulangWeiboLogin
               `id` int(11) NOT NULL AUTO_INCREMENT,
               `type` smallint(2) DEFAULT NULL COMMENT '对应的第三方账号类型，1：微博，2：微信，3：qq',
               `uid` int(11) DEFAULT NULL,
-              `nickname` varchar(256) DEFAULT NULL COMMENT '昵称',
+              `identifier` varchar(256) DEFAULT NULL COMMENT '昵称',
               `created_at` datetime DEFAULT NULL COMMENT '创建时间',
               `img` text,
               PRIMARY KEY (`id`)
@@ -135,6 +138,7 @@ class ZhulangWeiboLogin
               `id` int(11) NOT NULL AUTO_INCREMENT,
               `user_local_id` int(11) DEFAULT NULL COMMENT '本地账号id',
               `user_social_id` int(11) DEFAULT NULL COMMENT '第三方账号id，见库 wp_zoe_users_social',
+              `type` SMALLINT(2) DEFAULT NULL COMMENT '1：微博，2：微信，3：QQ',
               PRIMARY KEY (`id`)
             ) ENGINE=MyISAM DEFAULT CHARSET=utf8;";
         dbDelta($sql);
@@ -165,13 +169,15 @@ class ZhulangWeiboLogin
             $social_user_id    =  $this->haveSocialUserWithUid($_SESSION['zl_weibo_uid']);
             if (!$social_user_id) {
                 // 进行第三方用户记录
-                $this->insertUser($_SESSION['zl_weibo_uid']);
+                $this->insertUser($_SESSION['zl_weibo_uid'], $_SESSION['zl_weibo_identifier']);
             }
             // 查看是否绑定本地用户
             $social_user_id    =  $this->haveSocialUserWithUid($_SESSION['zl_weibo_uid']);
             $local_id          =  $this->haveLocalUserWithSocialId($social_user_id);
             if (!$local_id) {
                 // 没有绑定本地用户
+                echo '<u style="color: red">当前微博账号未绑定站点用户</u>';
+//                return;
             } else {
                 // 绑定了本地用户
                 $local_user    =  $this->getLocalUser($local_id);
@@ -181,7 +187,7 @@ class ZhulangWeiboLogin
                 header("Location:wp-admin/");
             }
         } else {
-            $this->insertUser($_SESSION['zl_weibo_uid']);
+            $this->insertUser($_SESSION['zl_weibo_uid'], $_SESSION['zl_weibo_identifier']);
         }
     }
 
@@ -224,14 +230,29 @@ class ZhulangWeiboLogin
         return $result;
     }
 
-    public function insertUser($uid, $nickname=null, $img=null) {
+    public function insertUser($uid, $identifier=null, $img=null) {
         $time   =  date('Y-m-d H:i:s');
-        $sql    =  "INSERT INTO $this->tb_social (type, uid, nickname, created_at, img) VALUES (1, $uid, '$nickname', '$time', '$img')";
+        $sql    =  "INSERT INTO $this->tb_social (type, uid, identifier, created_at, img) VALUES (1, $uid, '$identifier', '$time', '$img')";
+        return $this->wp_db->query($sql);
+    }
+
+    public function insertSocialUserIdentifier($identifier) {
+        $time    =  date("Y-m-d H:i:s");
+        $sql     =  "INSERT INTO $this->tb_social (type, identifier, created_at) VALUES (1, '$identifier', '$time')";
         return $this->wp_db->query($sql);
     }
 
     public function getLocalUser($user_id) {
         $sql    =  "SELECT * FROM wp_users WHERE ID = $user_id";
+        $result =  $this->wp_db->get_results($sql);
+        if (count($result) > 0) {
+            $result    =  $result[0];
+        }
+        return $result;
+    }
+
+    public function getSocialUser($social_id) {
+        $sql    =  "SELECT * FROM $this->tb_social WHERE id = $social_id";
         $result =  $this->wp_db->get_results($sql);
         if (count($result) > 0) {
             $result    =  $result[0];
@@ -248,6 +269,103 @@ class ZhulangWeiboLogin
             $_SESSION['zl_weibo_uid']    =  null;
             $_SESSION['zl_weibo_accesstoken']    =  null;
         }
+    }
+
+    public function adminMenu() {
+        add_options_page( $this->name_cn , $this->name_cn , 8 , basename(__FILE__) , [$this, 'adminMenuDetail']);
+    }
+
+    public function getSocialByIdentifier($identifier) {
+        $sql    =  "SELECT id FROM $this->tb_social WHERE identifier = '$identifier'";
+        $result =  $this->wp_db->get_results($sql);
+        if (count($result) > 0) {
+            $result    =  $result[0];
+        }
+        return $result;
+        // 返回的是一个对象，或者一个空数组
+    }
+
+    public function attachSocialUserToLocal($social_id, $local_id) {
+        // 绑定第三方到本地账户
+        // 本地账号是否绑定过，有两种策略，找到已有的进行更新，或者删除所有已有的，这里使用删除所有已有的
+        $this->detachSocialUserToLocal($local_id);
+        $sql    =  "INSERT INTO $this->tb_connection (user_local_id, user_social_id, type) VALUES ($local_id, $social_id, 1)";
+        $result =  $this->wp_db->query($sql);
+        return $result;
+    }
+
+    public function detachSocialUserToLocal($local_id, $social_id=null) {
+        // 解绑第三方和本地用户，如果没有提供 social_id 即解绑所有 local_id 对应的第三方
+        if (!$social_id) {
+            $sql    =  "DELETE FROM $this->tb_connection WHERE user_local_id = $local_id AND type = 1";
+        } else {
+            $sql    =  "DELETE FROM $this->tb_connection WHERE user_local_id = $local_id AND user_social_id = $social_id AND type = 1";
+        }
+        $result    =  $this->wp_db->query($sql);
+        return $result;
+    }
+
+    public function getSocialUserByLocalId($local_id) {
+        // 通过本地用户 id 获取第三方信息
+        $sql    =  "SELECT * FROM $this->tb_connection WHERE user_local_id = $local_id";
+        $result =  $this->wp_db->get_results($sql);
+        if (!count($result) > 0) {
+            return null;
+        }
+        $result =  $result[0];
+        $result =  $this->getSocialUser($result->user_social_id);
+        return $result;
+    }
+
+    public function adminMenuDetail() {
+        $submitted    =  false;
+        $current_user =  wp_get_current_user();
+        $current_correspond_social    =  $this->getSocialUserByLocalId($current_user->ID);
+        // 当前用户对应的第三方用户，可能是不存在的在这里，即用的时候要做空判断
+        if ($current_correspond_social) {
+            $current_social_identifier    =  $current_correspond_social->identifier;
+        } else {
+            $current_social_identifier    =  '';
+        }
+        $identifier   =  $_POST['weibo_identifier'];
+        if ($identifier) {
+            if ($social_user = $this->getSocialByIdentifier($identifier)) {
+                // 已经存在第三方账号
+                if ($local_id = $this->haveLocalUserWithSocialId($social_user->id)) {
+                    // 第三方账号有没有被绑定
+                    echo '微博已被绑定';
+                } else {
+                    $attach_result    =  $this->attachSocialUserToLocal($social_user->id, $current_user->ID);
+                    if ($attach_result) {
+                        $current_social_identifier    =  $identifier;
+                        echo '绑定成功A';
+                    } else {
+                        echo '绑定失败A';
+                    }
+                }
+            } else {
+                // 未存在第三方账号
+                $this->insertSocialUserIdentifier($identifier);
+                $social_user = $this->getSocialByIdentifier($identifier);
+                $attach_result    =  $this->attachSocialUserToLocal($social_user->id, $current_user->ID);
+                if ($attach_result) {
+                    $current_social_identifier    =  $identifier;
+                    echo '绑定成功B';
+                } else {
+                    echo '绑定失败B';
+                }
+            }
+            $submitted    =  true;
+        }
+
+        echo '<div class="wrap">';
+        echo '<form name="menu_form" method="post" action="">';
+        echo '<p style="font-weight:bold;">在此进行微博账号关联</p>';
+        echo '<p>微博账号<u style="color: red">昵称</u>：<input type="text" name="weibo_identifier" value="'.$current_social_identifier.'"></p>';
+        echo '<p class="submit"><input type="submit" value="保存设置"/>';
+        echo '<input type="button" value="返回上级" onclick="window.location.href=\'plugins.php\';" /></p>';
+        echo '</form>';
+        echo '</div>';
     }
 }
 
