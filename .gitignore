@@ -1,5 +1,13 @@
 akismet
 chats
+wp-ulike
+woocommerce
+woocommerce-gateway-paypal-express-checkout
+woocommerce-gateway-stripe
+
+*.png
+*.jpg
+*.gif
 
 /hello.php
 /index.php
