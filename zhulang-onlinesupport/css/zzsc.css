@@ -57,7 +57,7 @@ a, button {
 .online_content ul li{ height:24px; line-height:24px; margin-bottom:4px;}
 .online_content ul li a:hover{color:#c81d04; }
 
-#online_qq_layer {position:absolute; right:-140px; top:80px; _position:absolute; z-index:20;}
+#online_qq_layer {position:absolute; right:-140px; top:200px; _position:absolute; z-index:20;}
 * html,* html body {_background-attachment:fixed;}
 * html #online_qq_layer {_bottom:auto;_top:expression(eval(document.documentElement.scrollTop + 150));}
 #online_qq_tab {float:left; margin-top: 50px;}

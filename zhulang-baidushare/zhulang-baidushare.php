@@ -63,6 +63,7 @@ class ZhulangBaisuShare
 	}
 
 	public function b_menu() {
+		/*$page_title, $menu_title, $capability, $menu_slug, $function = '' */
 		add_options_page( $this->plugin_name , $this->plugin_name , 8 , basename(__FILE__) , [$this, 'b_option_add']);
 	}
 
