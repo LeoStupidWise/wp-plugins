@@ -9,6 +9,8 @@ Author: Zoe
 Author URI: https://github.com/LeoStupidWise/wp-plugins
 */
 
+require_once 'helper.php';
+
 class ZhulangPostManage
 {
     /*
@@ -42,16 +44,38 @@ class ZhulangPostManage
     }
 
     public function doAction() {
+//        add_action('init', [$this, 'doActionSecond']);
 
+        $current_url = home_url(add_query_arg(array()));
         if (!$this->haveTable($this->table_name)) {
             $this->createTable();
         }
-        add_action('the_post', [$this, 'addViewTime']);
-        add_action( 'widgets_init', [$this, 'registerWidget']);
-        // 使用 the_post 钩子会在页面加载文章的任何时候进行挂载，那么在 sidebar 里面的近期文章进行加载的时候，也会写入数据
 
         add_action('pre_get_posts', [$this, 'doPostOrder']);
         // 在输出文章列表之前，对文章进行排序
+
+        add_action('the_post', [$this, 'addViewTime']);
+        add_action( 'widgets_init', [$this, 'registerWidget']);
+
+//        add_filter( 'the_content', [$this, 'addViewNum'] );
+
+//        add_action('pre_get_posts', [$this, 'isLoadWidget']);
+
+    }
+
+    public function addViewNum($content) {
+        global $post;
+        $views      =  get_post_meta($post->ID, $this->view_meta_name, true);
+        $views      =  $views ? : 0;
+        $content    =  $content."热度:".$views;
+        return $content;
+    }
+
+    public function isLoadWidget() {
+        if (is_home()) {
+            add_action( 'widgets_init', [$this, 'registerWidget']);
+            // 使用 the_post 钩子会在页面加载文章的任何时候进行挂载，那么在 sidebar 里面的近期文章进行加载的时候，也会写入数据
+        }
     }
 
     public function registerWidget() {
@@ -59,7 +83,7 @@ class ZhulangPostManage
     }
 
     public function doPostOrder($query) {
-        //
+        // 这边不能使用 GET，如果使用 GET，将破坏 URL，会导致在主题下比如导航栏不能正常加载
         if ($_POST) {
             $post_order    =  $_POST['post_order'];
 
@@ -72,21 +96,34 @@ class ZhulangPostManage
                     $query->set( 'order', 'asc' );
                     break;
                 case 'order_hot':
-                    /*
-                     * Excludes an array of single post ID's from your home page
-                        function exclude_single_posts_home($query) {
-                            if ($query->is_home() && $query->is_main_query()) {
-                                $query->set('post__not_in', array(7,11));
-                             }
-                        }
-
-                    add_action('pre_get_posts', 'exclude_single_posts_home');
-                     * */
+                    // 可以按照热度顺序查询出文章的ID，然后再放到这个数组里面
+                    // 这样子是不可以的，where in 得出来的数据还是无序的
+                    // 多看官方文档啊，少年，下面的解决办法就是从官文找到的，找了真的有大半天
+                    // SW.Leo 2017-8-23
+                    $query->set('meta_key', '_zoe_views');
+                    $query->set('orderby', 'meta_value_num');
                     break;
                 case 'order_random':
+                    $query->set('orderby', 'rand');
                     break;
             }
         }
+    }
+
+    public function getPostByHotOrder() {
+        // 通过热度排序来获得文章的ID，返回一个数组，通过结合 pre_get_posts 钩子的 $query->set('post__in', []) 进行使用
+        // 输出的是一个对象数组，使用时需要判空
+
+        $sql    =  "SELECT post_id FROM wp_zoe_post_click GROUP BY post_id ORDER BY COUNT(post_id) DESC";
+        $tmp    =  [];
+        $result =  $this->wp_db->get_results($sql);
+        if (count($result) > 0) {
+            foreach($result as $key=>$value) {
+                $tmp[]    =  $value->post_id;
+            }
+            $result       = $tmp;
+        }
+        return $result;
     }
 
     public function createTable() {
@@ -180,13 +217,33 @@ class ZhulangPostManage
         else $ip = "Unknow";
         return $ip;
     }
+
+    public function fontSelector() {
+        // abandoned
+        ?>
+        <div>
+            <form method="get" action="#">
+                <select name="post_order" style="width: 150px; height: 30px">
+                    <option value ="order_time_desc">时间降序</option>
+                    <option value ="order_time_asc">时间升序</option>
+                    <option value ="order_hot">热度排序</option>
+                    <option value="order_random">随机排序</option>
+                </select>
+                <input style="height: auto; width: auto;" type="submit">
+            </form>
+        </div>
+        <?php
+    }
 }
 
 class ZhulangPostOrderWidget extends WP_Widget
 {
+    public $id_base    =  '';
+
     public function __construct()
     {
         $id_base    =  'zhulangpostordertool';
+        $this->id_base    =  $id_base;
         /*Optional Base ID for the widget, lowercase and unique. If left empty,a portion of the widget's class name will be used Has to be unique.*/
 
         $name       =  '逐浪文章排序小工具';
@@ -216,11 +273,10 @@ class ZhulangPostOrderWidget extends WP_Widget
         $order_random  = $instance['order_random'];
         ?>
         <p>标题: <input class="widefat" name="<?php echo $this->get_field_name( 'title' ); ?>" type="text" value="<?php echo esc_attr( $title ); ?>" /></p>
-        <p>排序一: <input class="widefat" name="<?php echo $this->get_field_name( 'order_time' ); ?> "type="text" value="<?php echo esc_attr( $order_time ); ?> " /></p>
-        <p>排序二: <input class="widefat" name="<?php echo $this->get_field_name( 'order_hot' ); ?> "type="text" value="<?php echo esc_attr( $order_hot ); ?> " /></p>
-        <p>排序三: <input class="widefat" name="<?php echo $this->get_field_name( 'order_random' ); ?> "type="text" value="<?php echo esc_attr( $order_random ); ?> " /></p>
+<!--        <p>排序一: <input class="widefat" name="--><?php //echo $this->get_field_name( 'order_time' ); ?><!-- "type="text" value="--><?php //echo esc_attr( $order_time ); ?><!-- " /></p>-->
+<!--        <p>排序二: <input class="widefat" name="--><?php //echo $this->get_field_name( 'order_hot' ); ?><!-- "type="text" value="--><?php //echo esc_attr( $order_hot ); ?><!-- " /></p>-->
+<!--        <p>排序三: <input class="widefat" name="--><?php //echo $this->get_field_name( 'order_random' ); ?><!-- "type="text" value="--><?php //echo esc_attr( $order_random ); ?><!-- " /></p>-->
         <?php
-//        return parent::form($instance); // TODO: Change the autogenerated stub
     }
 
     public function update($new_instance, $old_instance) {
@@ -230,41 +286,40 @@ class ZhulangPostOrderWidget extends WP_Widget
         $instance['order_time'] = strip_tags( trim(  $new_instance['order_time'] ) );
         $instance['order_hot'] = strip_tags( trim( $new_instance['order_hot'] ) );
         $instance['order_random'] = strip_tags( trim( $new_instance['order_random'] ) );
-//        return parent::update($new_instance, $old_instance); // TODO: Change the autogenerated stub
     }
 
     public function widget($args, $instance) {
-        ?>
-
-        <div>
-            <form method="post" action="#">
-                <select name="post_order" style="width: 150px; height: 30px">
-                    <option value ="order_time_desc">时间降序</option>
-                    <option value ="order_time_asc">时间升序</option>
-                    <option value ="order_hot">热度排序</option>
-                    <option value="order_random">随机排序</option>
-                </select>
-                <input style="height: auto; width: auto;" type="submit">
-            </form>
-        </div>
-
-        <?php
+//        $type        =  '';
+//        if ($_GET) {
+//            $type    =  $_GET['post_order'];
+//        }
+        // 不知道 WP 加载小工具的流程是怎么样的，这里使用 get 或者 post 完全传不到前台小工具
+        if (is_category() || is_home()) {
+//        if (is_home()) {
+            // 只让这个小工具在主页显示
+            ?>
+            <div style="margin-bottom: 4px">
+                <form action="" method="post">
+                    文章排序<br/><br/>
+                    <label><input name="post_order" type="radio" value="order_time_desc"
+                                  checked="checked"
+                        />时间降序</label>
+                    <label><input name="post_order" type="radio" value="order_time_asc"/>时间升序</label>
+                    <label><input name="post_order" type="radio" value="order_hot"/>热度排序</label>
+                    <label><input name="post_order" type="radio" value="order_random"
+                        />随机排序</label>
+                    <input style="height:20px; width:40px; display:block; text-align:center; line-height:1px; inline-size:auto" type="submit" value="确定">
+                </form>
+            </div>
+            <br/>
+            <br/>
+            <?php
+        }
 
         /*
          * 暂时无法实现通过后台来控制前台的显示内容，这里直接写死
          * SW.Leo 2017-8-22
          * */
-/*        extract( $args );
-        $title = apply_filters( 'widget_title', $instance['title'] );
-        $order_time    = empty( $instance['order_time'] ) ? ' ' : $instance['order_time'];
-        $order_hot     = empty( $instance['order_hot'] ) ? ' ' : $instance['order_hot'];
-        $order_random  = empty( $instance['order_random'] ) ? ' ' : $instance['order_random'];
-
-        echo '<p> 标题: ' . $title . '</p>';
-        echo '<p> 排序1: ' . $order_time. '</p>';
-        echo '<p> 排序2: ' . $order_hot. '</p>';
-        echo '<p> 排序3: ' . $order_random. '</p>';*/
-//        parent::widget($args, $instance); // TODO: Change the autogenerated stub
     }
 }
 

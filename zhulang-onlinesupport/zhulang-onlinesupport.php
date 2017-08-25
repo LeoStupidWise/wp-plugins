@@ -37,7 +37,6 @@ class ZhulangOnlineSupport
         $this->option_prefix       = 'zl_zoe_' . $this->name_en;
         $this->menu_page_slug_top  =  $this->author.'_'.$this->name_en.'_page_menu_top';
 //        $this->option_name_html    = $this->option_prefix . '_html';
-        //TODO 其实可以把 QQ 号码存在一条记录，用 JSON 保存，输入/输出做相关格式处理，暂时不搞那么先进
         $this->option_title         = $this->option_prefix.'_title';
         $this->option_qq_number_1  = $this->option_prefix.'_qq_number_1';
 //        $this->option_qq_number_2  = $this->option_prefix.'_qq_number_2';
@@ -154,6 +153,8 @@ class ZhulangOnlineSupport
             echo '<div><p style="color:blue"><strong>设置已保存。</strong></p></div>';
         }
         echo '<p class="submit"><input type="submit" value="保存设置"/>';
+//        echo '<input type="button" value="增加QQ"/>';
+//        echo '<input type="button" value="增加电话"/>';
         echo '<input type="button" value="返回上级" onclick="window.location.href=\'plugins.php\';" /></p>';
         echo '</form>';
         echo '</div>';

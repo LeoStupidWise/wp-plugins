@@ -21,6 +21,8 @@ class ZhulangWeiboLogin
     private $tb_connection_suffix    =  'zoe_users_local_social';
     private $tb_social    =  '';
     private $tb_connection    =  '';
+    private $session_wx_login =  'zl_weixin_login';                            // 用来记录是否微信登录的 session 键
+    private $session_social_user    =  'zl_zoe_social_user_id';               // session 中存放第三方用户 id 的键
 
     public function __construct()
     {
@@ -53,6 +55,11 @@ class ZhulangWeiboLogin
 
         add_action('login_form', [$this, 'didWeiboLogin']);
         // 是否微博登录
+        add_action('login_form', [$this, 'didWechatLogin']);
+        // 是否微信登录
+
+        add_action( 'user_register', [$this, 'doAttachWhenWechatLogin']);
+        // 用户注册的时候检查是不是已经登录了微信第三方
 
         add_action('wp_logout', [$this, 'userLogout']);
         // 登出是释放 session
@@ -102,6 +109,14 @@ class ZhulangWeiboLogin
         return $file_contents;
     }
 
+    public function doAttachWhenWechatLogin($user_id) {
+        // 是否登录了微信第三方
+        if (isset($_SESSION[$this->session_social_user])) {
+            // 如果进行了第三方登录
+            $this->attachSocialUserToLocal($_SESSION[$this->session_social_user], $user_id, 2);
+        }
+    }
+
     public function haveTable($table_name) {
         // 数据表中是否有对应的表格
         // 有就会返回表名，没有返回 null
@@ -113,12 +128,14 @@ class ZhulangWeiboLogin
         // 创建第三方用户表
         require_once(ABSPATH . "wp-admin/includes/upgrade.php");  //引用wordpress的内置方法库
 
-        $sql    =  "DROP TABLE IF EXISTS `wp_zoe_users_social`;
-            CREATE TABLE `wp_zoe_users_social` (
+        $sql    =  "DROP TABLE IF EXISTS `$this->tb_social`;
+            CREATE TABLE `$this->tb_social` (
               `id` int(11) NOT NULL AUTO_INCREMENT,
+              `nickname` varchar(50) DEFAULT NULL COMMENT '昵称',
               `type` smallint(2) DEFAULT NULL COMMENT '对应的第三方账号类型，1：微博，2：微信，3：qq',
-              `uid` int(11) DEFAULT NULL,
-              `identifier` varchar(256) DEFAULT NULL COMMENT '昵称',
+              `uid` VARCHAR(128) DEFAULT NULL,
+              `identifier` varchar(256) DEFAULT NULL COMMENT '微博：昵称，微信：open_id',
+              `remark` varchar(256) DEFAULT NULL COMMENT '',
               `created_at` datetime DEFAULT NULL COMMENT '创建时间',
               `img` text,
               PRIMARY KEY (`id`)
@@ -133,8 +150,8 @@ class ZhulangWeiboLogin
         // 创建关联表
         require_once(ABSPATH . "wp-admin/includes/upgrade.php");  //引用wordpress的内置方法库
 
-        $sql    =  "DROP TABLE IF EXISTS `wp_zoe_users_local_social`;
-            CREATE TABLE `wp_zoe_users_local_social` (
+        $sql    =  "DROP TABLE IF EXISTS `$this->tb_connection`;
+            CREATE TABLE `$this->tb_connection` (
               `id` int(11) NOT NULL AUTO_INCREMENT,
               `user_local_id` int(11) DEFAULT NULL COMMENT '本地账号id',
               `user_social_id` int(11) DEFAULT NULL COMMENT '第三方账号id，见库 wp_zoe_users_social',
@@ -160,12 +177,13 @@ class ZhulangWeiboLogin
     public function zoe_login_message() {
         $img_url    =  plugins_url("/".$this->file_name."/images/logo-test.jpg");
         $weibo_index=  plugins_url("/".$this->file_name."/weibo/index.php");
-        echo "<p><a href='$weibo_index'><img src='$img_url'></a></p><br />";
+        $img_url_wx =  plugins_url("/".$this->file_name."/images/login-wechat.jpg");
+        $wx_index   =  plugins_url("/".$this->file_name."/wechat/index.php");
+        echo "<p><a href='$weibo_index'><img src='$img_url'></a> <a href='$wx_index'><img src='$img_url_wx'></a></p><br />";
     }
 
     function didWeiboLogin() {
-//        var_dump($_SESSION);
-        if ($_SESSION['zl_weibo_accesstoken']) {
+        if (isset($_SESSION['zl_weibo_accesstoken'])) {
             $social_user_id    =  $this->haveSocialUserWithUid($_SESSION['zl_weibo_uid']);
             if (!$social_user_id) {
                 // 进行第三方用户记录
@@ -180,14 +198,64 @@ class ZhulangWeiboLogin
 //                return;
             } else {
                 // 绑定了本地用户
-                $local_user    =  $this->getLocalUser($local_id);
-                wp_set_current_user($local_id, $local_user->user_login);
-                wp_set_auth_cookie($local_id);
-                do_action('wp_login', $local_user->user_login);
-                header("Location:wp-admin/");
+                $this->redirectWhileHaveLocalUser($local_id);
+            }
+        }
+//        else {
+//            $this->insertUser($_SESSION['zl_weibo_uid'], $_SESSION['zl_weibo_identifier']);
+//        }
+    }
+
+    public function didWechatLogin() {
+        // 有没有进行微信登录
+        // 如果有，在 session 中会有如下信息
+        /*array(1) {
+        ["zl_weixin_login"]=> string(342) "{
+        "openid":"oEh2zwE01y5RclOrFqSqJlCQCdII",
+        "nickname":"Yz",
+        "sex":1,
+        "language":"zh_CN",
+        "city":"Yueyang",
+        "province":"Hunan",
+        "country":"CN",
+        "headimgurl":"http:\/\/wx.qlogo.cn\/mmopen\/9L7tv8LIFcUZKTSHPqNiapG9gP05btH2icF6Zic9cicu0XwHXplPozek02dfHsJ2RFQA5jbfz4ZHvteMhibw30J0Zks0icV1TYumJg\/0",
+        "privilege":[],
+        "unionid":"oK8LF0tB1foo2OgTF1UgPkAuZQVQ"}"
+        }*/
+        if (isset($_SESSION[$this->session_wx_login])) {
+            // 如果有进行微信登录
+            $user_info    =  json_decode($_SESSION[$this->session_wx_login], true);
+            $insert_values=  [
+                'type'       => 2,
+                'nickname'   => $user_info['nickname'],
+                'uid'        => $user_info['openid'],
+                'identifier' => $user_info['openid'],
+                'img'         => $user_info['headimgurl']
+            ];
+            // 先检查库里面有没有对应微信账号
+            $check     =  [
+                'identifier'    =>  $user_info['openid']
+            ];
+            $inserted  =  $this->wherePublic($check);
+            if (!$inserted) {
+                $wx_user_id    =  $this->insertUserPublic($insert_values);
+            } else {
+                $wx_user_id    =  $inserted->id;
+            }
+            $local_user_id     =  $this->haveLocalUserWithSocialId($wx_user_id);
+            if (!$local_user_id) {
+                // 没有绑定本地用户
+                $param_arr     =  [
+                    'user_id'    => $wx_user_id
+                ];
+                $_SESSION[$this->session_social_user]    =  $wx_user_id;
+                $this->redirectWhenNeedRegister($param_arr, '该微信号暂未绑定站点账号');
+            } else {
+                // 已经绑定本地用户
+                $this->redirectWhileHaveLocalUser($local_user_id);
             }
         } else {
-            $this->insertUser($_SESSION['zl_weibo_uid'], $_SESSION['zl_weibo_identifier']);
+            // 没有进行微信登录
         }
     }
 
@@ -204,6 +272,18 @@ class ZhulangWeiboLogin
             default:
                 return 0;
         }
+    }
+
+    public function redirectWhileHaveLocalUser($local_user_id, $direction=null) {
+        // 当第三方绑定了本地用户之后实现的跳转
+        if (!$direction) {
+            $direction =  "Location:wp-admin/";
+        }
+        $local_user    =  $this->getLocalUser($local_user_id);
+        wp_set_current_user($local_user_id, $local_user->user_login);
+        wp_set_auth_cookie($local_user_id);
+        do_action('wp_login', $local_user->user_login);
+        header($direction);
     }
 
     public function haveSocialUserWithUid($uid) {
@@ -230,10 +310,81 @@ class ZhulangWeiboLogin
         return $result;
     }
 
+    public function redirectWhenNeedRegister($params_arr, $message, $direct=false) {
+        // 当需要注册时的跳转
+        // params_arr 是带到链接里面的参数
+        // message：提示信息
+        // direct
+        //      true：直接跳转，不给出 a 链接
+        //      false：给出 a 链接
+        $info     =  '';
+        if ($length=count($params_arr) > 0) {
+            foreach($params_arr as $key=>$value) {
+                $info    .= "&"."$key=$value";
+            }
+        }
+        if (!$direct) {
+            echo "<t style='color: red'>$message".",请先使用站点用户进行登录，或者<a href='/wp-login.php?action=register$info'>前往注册绑定</a></t>";
+        }
+    }
+
     public function insertUser($uid, $identifier=null, $img=null) {
         $time   =  date('Y-m-d H:i:s');
         $sql    =  "INSERT INTO $this->tb_social (type, uid, identifier, created_at, img) VALUES (1, $uid, '$identifier', '$time', '$img')";
         return $this->wp_db->query($sql);
+    }
+
+    public function insertUserPublic($arr) {
+        // 通过键值对来进行数据插入
+        // 插入成功返回最新ID
+        $time    =  date("Y-m-d H:i:s");
+        if (!count($arr) > 0) {
+            return null;
+        }
+        $keys    =  'created_at';
+        $values  =  "'$time'";
+        foreach ($arr as $key=>$value) {
+            $keys    .= ', '.$key;
+            $values  .= ", '$value'";
+        }
+        $sql      =  "INSERT INTO $this->tb_social ($keys) VALUES ($values)";
+        $result   =  $this->wp_db->query($sql);
+        if ($result) {
+            $sql       =  "SELECT LAST_INSERT_ID()";
+            $result    =  $this->wp_db->get_results($sql);
+            // object(stdClass)#352 (1) { ["LAST_INSERT_ID()"]=> string(1) "1" } }
+            if ($result) {
+                $str   =  "LAST_INSERT_ID()";
+                $result=  $result[0]->$str;
+            }
+        }
+        return $result;
+    }
+
+    public function wherePublic($arr, $relation='and') {
+        // 通过键值对来进行chaxun
+        // 通过键值对来进行数据插入
+        $where        =  '';
+        $count        =  1;
+        $length       =  count($arr);
+        $basic_sql    =  "SELECT * FROM $this->tb_social WHERE ";
+        if (!($length > 0)) {
+            return null;
+        }
+        foreach ($arr as $key=>$value) {
+            if ($count != $length) {
+                // 当前一个不是最后一个
+                $where    .= $key.' = '."'$value'"." AND ";
+            } else {
+                $where    .= $key.' = '."'$value'";
+            }
+        }
+        $sql      = $basic_sql.$where;
+        $result =  $this->wp_db->get_results($sql);
+        if (count($result) > 0) {
+            $result    =  $result[0];
+        }
+        return $result;
     }
 
     public function insertSocialUserIdentifier($identifier) {
@@ -266,8 +417,13 @@ class ZhulangWeiboLogin
 
     public function userLogout() {
         if ($_SESSION['zl_weibo_accesstoken']) {
+            // 清空微博SESSION
             $_SESSION['zl_weibo_uid']    =  null;
             $_SESSION['zl_weibo_accesstoken']    =  null;
+        } if ($_SESSION[$this->session_social_user]) {
+            // 清空微信SESSION
+            $_SESSION[$this->session_social_user]    =  null;
+            $_SESSION[$this->session_wx_login]       =  null;
         }
     }
 
@@ -285,11 +441,11 @@ class ZhulangWeiboLogin
         // 返回的是一个对象，或者一个空数组
     }
 
-    public function attachSocialUserToLocal($social_id, $local_id) {
+    public function attachSocialUserToLocal($social_id, $local_id, $type=1) {
         // 绑定第三方到本地账户
         // 本地账号是否绑定过，有两种策略，找到已有的进行更新，或者删除所有已有的，这里使用删除所有已有的
         $this->detachSocialUserToLocal($local_id);
-        $sql    =  "INSERT INTO $this->tb_connection (user_local_id, user_social_id, type) VALUES ($local_id, $social_id, 1)";
+        $sql    =  "INSERT INTO $this->tb_connection (user_local_id, user_social_id, type) VALUES ($local_id, $social_id, $type)";
         $result =  $this->wp_db->query($sql);
         return $result;
     }
