@@ -8,11 +8,11 @@
 
 require_once 'config.php';
 require_once 'saetv2.ex.class.php';
-
+session_start();
 $code    =  $_GET['code'];
 
 $keys['code']    =  $code;
-$keys['redirect_uri']    =  WB_CALLBACK;
+$keys['redirect_uri']    =  HOME_URL.'/'.WB_CALLBACK;
 
 $object  =  new SaeTOAuthV2(WB_KEY, WB_SEC);
 $oauth   =  $object->getAccessToken('code', $keys);
@@ -32,11 +32,12 @@ $oauth   =  $object->getAccessToken('code', $keys);
 
 $_SESSION['zl_weibo_accesstoken']    =   $oauth['access_token'];
 $_SESSION['zl_weibo_uid']    =  $oauth['uid'];
-$_SESSION['zl_weibo_identifier']    =  $oauth['name'];
+$_SESSION['zl_weibo_identifier']    =  $oauth['uid'];
 
-$client_obj   =  new SaeTClientV2(WB_KEY, WB_SEC, $oauth['access_token']);
-$user    =  $client_obj->show_user_by_id($oauth['uid']);
+//$client_obj   =  new SaeTClientV2(WB_KEY, WB_SEC, $oauth['access_token']);
+//$user    =  $client_obj->show_user_by_id($oauth['uid']);
 
 //var_dump($user);
 
-header('Location: http://test.wp.yz/wp-login.php');
+$location    =  'Location: '.HOME_URL.'/wp-login.php';
+header($location);

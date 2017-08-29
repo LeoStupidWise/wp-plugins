@@ -22,7 +22,8 @@ class ZhulangWeiboLogin
     private $tb_social    =  '';
     private $tb_connection    =  '';
     private $session_wx_login =  'zl_weixin_login';                            // 用来记录是否微信登录的 session 键
-    private $session_social_user    =  'zl_zoe_social_user_id';               // session 中存放第三方用户 id 的键
+    private $session_social_user    =  'zl_zoe_social_user_id';               // session 中存放第三方用户 id 的键，微博
+    private $session_social_wechat  =  'zl_zoe_social_user_id_wechat';      // session 中存放第三方用户 id 的键，微信
 
     public function __construct()
     {
@@ -50,6 +51,9 @@ class ZhulangWeiboLogin
             $this->createTableSocialConnection();
         }
 
+        add_action('wp_logout', [$this, 'userLogout']);
+        // 登出时释放 session
+
         add_action('login_form', [$this, 'zoe_login_message']);
         // 增加微博登录图标
 
@@ -58,11 +62,13 @@ class ZhulangWeiboLogin
         add_action('login_form', [$this, 'didWechatLogin']);
         // 是否微信登录
 
-        add_action( 'user_register', [$this, 'doAttachWhenWechatLogin']);
+        add_action( 'user_register', [$this, 'doAttachWhenWechatRegister']);
+        add_action( 'user_register', [$this, 'doAttachWhenWeiboRegister']);
         // 用户注册的时候检查是不是已经登录了微信第三方
 
-        add_action('wp_logout', [$this, 'userLogout']);
-        // 登出是释放 session
+        add_action('wp_login', [$this, 'doAttachWhenWechatLogin'], 10, 2);
+        add_action('wp_login', [$this, 'doAttachWhenWeiboLogin'], 10 ,2);
+        // 也有可能是用户已有站点账号，只是没有进行第三方绑定，上面是用户未注册站点账号
 
         add_action('admin_menu', [$this, 'adminMenu']);
     }
@@ -109,11 +115,37 @@ class ZhulangWeiboLogin
         return $file_contents;
     }
 
-    public function doAttachWhenWechatLogin($user_id) {
+    public function doAttachWhenWechatRegister($user_id) {
         // 是否登录了微信第三方
+        // 因为这个函数是和 wp_login 绑定在一起的，所以这里只能有一个 user_id
+        if (isset($_SESSION[$this->session_social_wechat])) {
+            $this->attachSocialUserToLocal($_SESSION[$this->session_social_wechat], $user_id, 2);
+        }
+    }
+
+    public function doAttachWhenWeiboRegister($user_id) {
+        // 是否登录了微信第三方
+        // 因为这个函数是和 wp_login 绑定在一起的，所以这里只能有一个 user_id
         if (isset($_SESSION[$this->session_social_user])) {
             // 如果进行了第三方登录
-            $this->attachSocialUserToLocal($_SESSION[$this->session_social_user], $user_id, 2);
+            $this->attachSocialUserToLocal($_SESSION[$this->session_social_user], $user_id, 1);
+        }
+    }
+
+    public function doAttachWhenWechatLogin($user_name, $user) {
+        // 是否登录了微信第三方
+        // 因为这个函数是和 wp_login 绑定在一起的，所以这里只能有一个 user_id
+        if (isset($_SESSION[$this->session_social_wechat])) {
+            // 如果进行了第三方登录
+            $this->attachSocialUserToLocal($_SESSION[$this->session_social_wechat], $user->ID, 2);
+        }
+    }
+
+    public function doAttachWhenWeiboLogin($user_name, $user) {
+        // 是否登录了微博第三方
+        if (isset($_SESSION[$this->session_social_user])) {
+            // 如果进行了第三方登录
+            $this->attachSocialUserToLocal($_SESSION[$this->session_social_user], $user->ID, 1);
         }
     }
 
@@ -190,11 +222,17 @@ class ZhulangWeiboLogin
                 $this->insertUser($_SESSION['zl_weibo_uid'], $_SESSION['zl_weibo_identifier']);
             }
             // 查看是否绑定本地用户
+            // TODO：这里可以进行优化，第三方用户ID可以在插入的时候就获取，不用再去查一次
             $social_user_id    =  $this->haveSocialUserWithUid($_SESSION['zl_weibo_uid']);
+            $_SESSION[$this->session_social_user]    =  $social_user_id;
             $local_id          =  $this->haveLocalUserWithSocialId($social_user_id);
             if (!$local_id) {
                 // 没有绑定本地用户
-                echo '<u style="color: red">当前微博账号未绑定站点用户</u>';
+//                echo '<u style="color: red">当前微博账号未绑定站点用户</u>';
+                $param_arr     =  [
+                    'user_id'    => $social_user_id
+                ];
+                $this->redirectWhenNeedRegister($param_arr, '该微博号暂未绑定站点账号');
 //                return;
             } else {
                 // 绑定了本地用户
@@ -202,6 +240,7 @@ class ZhulangWeiboLogin
             }
         }
 //        else {
+//            // 没有进行微博登录
 //            $this->insertUser($_SESSION['zl_weibo_uid'], $_SESSION['zl_weibo_identifier']);
 //        }
     }
@@ -248,7 +287,7 @@ class ZhulangWeiboLogin
                 $param_arr     =  [
                     'user_id'    => $wx_user_id
                 ];
-                $_SESSION[$this->session_social_user]    =  $wx_user_id;
+                $_SESSION[$this->session_social_wechat]    =  $wx_user_id;
                 $this->redirectWhenNeedRegister($param_arr, '该微信号暂未绑定站点账号');
             } else {
                 // 已经绑定本地用户
@@ -286,10 +325,10 @@ class ZhulangWeiboLogin
         header($direction);
     }
 
-    public function haveSocialUserWithUid($uid) {
+    public function haveSocialUserWithUid($uid, $type=1) {
         // 使用query，进行 select 返回结果数据条数
         // 使用 get_results 返回一个对象数组，即包括几个对象的一个数组
-        $sql    =  "SELECT id FROM $this->tb_social WHERE uid = $uid";
+        $sql    =  "SELECT id FROM $this->tb_social WHERE uid = $uid AND type = $type";
         $result =  $this->wp_db->get_results($sql);
         if (count($result) > 0) {
             $result    =  $result[0];
@@ -418,12 +457,10 @@ class ZhulangWeiboLogin
     public function userLogout() {
         if ($_SESSION['zl_weibo_accesstoken']) {
             // 清空微博SESSION
-            $_SESSION['zl_weibo_uid']    =  null;
-            $_SESSION['zl_weibo_accesstoken']    =  null;
-        } if ($_SESSION[$this->session_social_user]) {
+           session_unset();
+        } if (isset($_SESSION[$this->session_social_user]) || isset($_SESSION[$this->session_wx_login])) {
             // 清空微信SESSION
-            $_SESSION[$this->session_social_user]    =  null;
-            $_SESSION[$this->session_wx_login]       =  null;
+            session_unset();
         }
     }
 
@@ -444,6 +481,7 @@ class ZhulangWeiboLogin
     public function attachSocialUserToLocal($social_id, $local_id, $type=1) {
         // 绑定第三方到本地账户
         // 本地账号是否绑定过，有两种策略，找到已有的进行更新，或者删除所有已有的，这里使用删除所有已有的
+        // TODO：绑定当前第三方的时候，如果当前站点用户之前已绑定其他第三方，会直接删除之前的第三方（不进行提示），然后绑定当前
         $this->detachSocialUserToLocal($local_id);
         $sql    =  "INSERT INTO $this->tb_connection (user_local_id, user_social_id, type) VALUES ($local_id, $social_id, $type)";
         $result =  $this->wp_db->query($sql);

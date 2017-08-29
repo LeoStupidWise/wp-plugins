@@ -10,9 +10,10 @@ require_once 'config.php';
 require_once 'saetv2.ex.class.php';
 
 $object    =  new SaeTOAuthV2(WB_KEY, WB_SEC);
-$oauth     =  $object->getAuthorizeURL(WB_CALLBACK);
+$url       =  HOME_URL.'/'.WB_CALLBACK;
+$oauth     =  $object->getAuthorizeURL($url);
 
-//var_dump($oauth);
+var_dump($oauth);
 // 得到了微博授权登录地址
 
 header('Location:'.$oauth);
