@@ -9,7 +9,7 @@ Author: Zoe
 Author URI: https://github.com/LeoStupidWise/wp-plugins
 */
 
-require_once 'helper.php';
+//require_once 'helper.php';
 
 class ZhulangPostManage
 {

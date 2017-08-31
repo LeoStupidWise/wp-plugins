@@ -14,21 +14,21 @@ audio:not([controls]) {
  }
 
 html {
-    font-family: sans-serif;
-    -ms-text-size-adjust: 100%;
-    -webkit-text-size-adjust: 100%;
+    /*font-family: sans-serif;*/
+    /*-ms-text-size-adjust: 100%;*/
+    /*-webkit-text-size-adjust: 100%;*/
 }
 
 body {
-    margin: 0;
+    /*margin: 0;*/
 }
 
 a:focus {
-    outline: thin dotted;
+    /*outline: thin dotted;*/
 }
 
 a:active,a:hover {
-    outline: 0;
+    /*outline: 0;*/
 }
 
 h1 {
@@ -49,9 +49,9 @@ dfn {
 }
 
 hr {
-    -moz-box-sizing: content-box;
-    box-sizing: content-box;
-    height: 0;
+    /*-moz-box-sizing: content-box;*/
+    /*box-sizing: content-box;*/
+    /*height: 0;*/
 }
 
 mark {
@@ -164,6 +164,6 @@ textarea {
 }
 
 table {
-    border-collapse: collapse;
-    border-spacing: 0;
+    /*border-collapse: collapse;*/
+    /*border-spacing: 0;*/
 }

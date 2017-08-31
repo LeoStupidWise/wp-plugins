@@ -1,0 +1,20 @@
+.zoe_plugin_post_tag_border{
+    /**/
+    margin: 100px 0 100px 0;
+    z-index: 999;
+    position: relative;
+}
+
+.zoe_plugin_post_tag_form{
+    /**/
+}
+
+.zoe_plugin_post_tag_single{
+    /**/
+    margin: 5px;
+}
+
+.zoe_plugin_post_tag_confirm{
+    /**/
+    display:block;
+}

@@ -76,9 +76,6 @@ class ZhulangOnlineSupport
 //        $support_time   =  get_option($this->option_support_time);
         $slogan         =  '我们竭诚为您服务！';
         $qq_number_1    =  get_option($this->option_qq_number_1) ? get_option($this->option_qq_number_1) : $slogan;
-//        $qq_number_2    =  get_option($this->option_qq_number_2) ? get_option($this->option_qq_number_2) : $slogan;
-//        $qq_number_3    =  get_option($this->option_qq_number_3) ? get_option($this->option_qq_number_3) : $slogan;
-//        $qq_number_4    =  get_option($this->option_qq_number_4) ? get_option($this->option_qq_number_4) : $slogan;
         $qq_numbers     =  explode($this->fengefu, $qq_number_1);
         $phones         =  explode($this->fengefu, $phone);
         echo '<div id="goto_top"></div>';
@@ -101,9 +98,6 @@ class ZhulangOnlineSupport
                 echo "<li><a target='_blank' href='http://wpa.qq.com/msgrd?v=3&uin=$qq_number&site=qq&menu=yes'><img border='0' src='http://wpa.qq.com/pa?p=2:12345678:51' alt=$qq_number title=$slogan></a></li>";
             }
         }
-//        echo "<li><a target='_blank' href='http://wpa.qq.com/msgrd?v=3&uin=$qq_number_2&site=qq&menu=yes'><img border='0' src='http://wpa.qq.com/pa?p=2:12345678:51' alt=$qq_number_2 title=$slogan></a></li>";
-//        echo "<li><a target='_blank' href='http://wpa.qq.com/msgrd?v=3&uin=$qq_number_3&site=qq&menu=yes'><img border='0' src='http://wpa.qq.com/pa?p=2:12345678:51' alt=$qq_number_3 title=$slogan></a></li>";
-//        echo "<li><a target='_blank' href='http://wpa.qq.com/msgrd?v=3&uin=$qq_number_4&site=qq&menu=yes'><img border='0' src='http://wpa.qq.com/pa?p=2:12345678:51' alt=$qq_number_4 title=$slogan></a></li>";
         if (count($phones) > 0) {
             foreach($phones as $key=>$value) {
                 echo "<li>电话：$value</li>";
@@ -141,20 +135,14 @@ class ZhulangOnlineSupport
         $support_time   =  get_option($this->option_support_time);
         echo '<div class="wrap">';
         echo '<form name="option_form" method="post" action="">';
-        echo '<p style="font-weight:bold;">在此处对在线客服进行设置。</p>';
+        echo '<p style="font-weight:bold;">请在此进行在线客服功能设置！</p>';
         echo "<p>标题：<input type='text' name='title' value='$title'></p><br/>";
         echo "<p>联系QQ<u style=\"color: red\">多个QQ使用逗号（英文逗号）“,”隔开。</u>：</p><textarea style='height:150px;width:500px' name='qq_number_1'>" . $qq_number_1 . '</textarea><br/>';
-//        echo "<p>联系QQ2：<input type='text' name='qq_number_2' value='$qq_number_2'></p>";
-//        echo "<p>联系QQ3：<input type='text' name='qq_number_3' value='$qq_number_3'></p>";
-//        echo "<p>联系QQ4：<input type='text' name='qq_number_4' value='$qq_number_4'></p>";
         echo "<p>联系电话<u style=\"color: red\">多个电话使用逗号（英文逗号）“,”隔开。</u>：</p><textarea style='height:150px;width:500px' name='phone'>" . $phone . '</textarea>';
-//        echo "<p>在线时间：<input type='text' name='support_time' placeholder='示例  周一至周五：09:00-18:00' style='width: 230px' value='$support_time'></p>";
         if ($qq_number_1 || $qq_number_2 || $qq_number_3 || $qq_number_4 || $phone || $support_time) {
             echo '<div><p style="color:blue"><strong>设置已保存。</strong></p></div>';
         }
         echo '<p class="submit"><input type="submit" value="保存设置"/>';
-//        echo '<input type="button" value="增加QQ"/>';
-//        echo '<input type="button" value="增加电话"/>';
         echo '<input type="button" value="返回上级" onclick="window.location.href=\'plugins.php\';" /></p>';
         echo '</form>';
         echo '</div>';
